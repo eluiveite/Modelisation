@@ -7,7 +7,7 @@ import re
 %matplotlib qt
 
 # Charger le fichier CSV
-file_path = "recipes.csv"
+file_path = "C:/Users/PC/Desktop/recipes.csv"
 df = pd.read_csv(file_path)
 
 # Vérifier que la colonne "total_time" existe
