@@ -1,0 +1,100 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import re
+
+# Activer l'affichage des graphiques dans une fenêtre séparée
+%matplotlib qt
+
+# Charger le fichier CSV
+file_path = "C:/Users/PC/Desktop/recipes.csv"
+df = pd.read_csv(file_path)
+
+# Vérifier que la colonne "total_time" existe
+if "total_time" not in df.columns:
+    raise ValueError("La colonne 'total_time' est introuvable dans le fichier CSV.")
+
+# Fonction pour convertir le temps total en minutes
+def convert_to_minutes(time_str):
+    if pd.isna(time_str):
+        return np.nan  # Gérer les valeurs manquantes
+    
+    time_str = time_str.lower().replace(" ", "")  # Normalisation du texte
+
+    hours = re.search(r'(\d+)\s*(h|heure)', time_str)  # Cherche les heures
+    minutes = re.search(r'(\d+)\s*(m|min)', time_str)  # Cherche les minutes
+
+    total_minutes = 0
+    
+    if hours:
+        total_minutes += int(hours.group(1)) * 60  # Convertit heures en minutes
+    if minutes:
+        total_minutes += int(minutes.group(1))  # Garde les minutes
+    
+    return total_minutes if total_minutes > 0 else np.nan  # Évite les erreurs
+
+# Nettoyage des données
+df = df[['recipe_name', 'rating', 'total_time']].dropna()
+df = df.drop_duplicates(subset=['recipe_name'])  # Garder uniquement les recettes uniques
+df['total_time'] = df['total_time'].apply(convert_to_minutes)
+
+# Séparation des variables
+X = df[['total_time']].values.flatten()
+y = df['rating'].values
+
+# Fonction pour construire un arbre de décision basique
+def build_tree(X, y, depth=0, max_depth=5):
+    if depth >= max_depth or len(set(y)) == 1:
+        return np.mean(y)
+    
+    best_split = np.median(X)
+    left_indices = X < best_split
+    right_indices = X >= best_split
+    
+    if len(y[left_indices]) == 0 or len(y[right_indices]) == 0:
+        return np.mean(y)
+    
+    return {
+        'split': best_split,
+        'left': build_tree(X[left_indices], y[left_indices], depth + 1, max_depth),
+        'right': build_tree(X[right_indices], y[right_indices], depth + 1, max_depth),
+        'samples': len(y),
+        'value': np.mean(y)
+    }
+
+# Construire l'arbre
+tree = build_tree(X, y)
+
+# Fonction pour afficher l'arbre avec annotations
+def plot_tree(tree, x=0.5, y=1, dx=3.2, dy=1.2, depth=0, max_depth=5):
+    if isinstance(tree, dict):
+        text = f'Split: {tree["split"]:.1f}\nSamples: {tree["samples"]}\nValue: {tree["value"]:.2f}'
+        plt.text(x, y, text, ha='center', fontsize=max(8, 14 - depth * 2),
+                 bbox=dict(facecolor='orange', edgecolor='black'))
+        
+        # Ajustement dynamique de l'espacement
+        dx_adj = dx / (2 ** (depth + 1.2))
+        dy_adj = dy * (1 + depth * 1.2)
+        if -19.6 <= y <= -19:  # Augmenter l'espacement horizontal pour éviter le chevauchement
+            dx_adj *= 2
+        left_x, right_x = x - dx_adj, x + dx_adj
+        left_y, right_y = y - dy_adj, y - dy_adj
+        
+        plt.plot([x, left_x], [y, left_y], 'k-')
+        plt.plot([x, right_x], [y, right_y], 'k-')
+        
+        plot_tree(tree['left'], left_x, left_y, dx, dy, depth + 1, max_depth)
+        plot_tree(tree['right'], right_x, right_y, dx, dy, depth + 1, max_depth)
+    else:
+        plt.text(x, y, f'Value: {tree:.2f}', ha='center', fontsize=8,
+                 bbox=dict(facecolor='lightgray', edgecolor='black'))
+
+# Affichage de l'arbre
+plt.figure(figsize=(32, 26))  # Augmenter encore la taille du graphe
+manager = plt.get_current_fig_manager()
+manager.window.showMaximized()  # Maximiser la fenêtre
+
+plot_tree(tree)
+plt.axis('off')
+plt.tight_layout()  # Ajuster automatiquement les marges
+plt.show()
